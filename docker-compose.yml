@@ -1,0 +1,74 @@
+version: "3.6"
+
+volumes:
+  postgres:
+  composer_cache:
+    external: true
+
+services:
+  server:
+    build:
+      context: ./
+      dockerfile: docker/php/Dockerfile
+    depends_on:
+      - postgres
+      - worker
+    volumes:
+      - "./src:/app"
+    env_file:
+      - .docker.env
+    ports:
+      - "8080:8000"
+    working_dir: "/app"
+    entrypoint: "php artisan serve --host=0.0.0.0"
+
+  worker:
+    build:
+      context: ./
+      dockerfile: docker/php/Dockerfile
+    restart: unless-stopped
+    deploy:
+      replicas: 3
+    depends_on:
+      - postgres
+    volumes:
+      - "./src:/app"
+    env_file:
+      - .docker.env
+    working_dir: "/app"
+    entrypoint: "php artisan queue:work"
+
+  postgres:
+    image: postgres:15.2
+    env_file:
+      - .docker.env
+    volumes:
+      - "postgres:/var/lib/postgresql/data"
+    ports:
+      - "15432:5432"
+
+  artisan:
+    build:
+      context: ./
+      dockerfile: docker/php/Dockerfile
+    depends_on:
+      - postgres
+    volumes:
+      - "./src:/app"
+    env_file:
+      - .docker.env
+    working_dir: "/app"
+    entrypoint: "php artisan"
+
+  composer:
+    image: composer
+    volumes:
+      - "./src:/app"
+      - composer_cache:/tmp
+
+  npm:
+    image: node:19.8-alpine3.16
+    volumes:
+      - "./src:/app"
+    working_dir: "/app"
+    entrypoint: ["npm"]
